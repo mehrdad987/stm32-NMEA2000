@@ -1,4 +1,5 @@
 /* USER CODE BEGIN Header */
+/* https://github.com/mehrdad987/stm32-NMEA2000 */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
@@ -58,7 +59,31 @@ typedef struct {
 // Lookup table mapping PGNs to their names
 PGN_Name pgnNames[] = {
     {129029, "GNSS Position Data"},
- 
+    {130306, "Wind Data"},
+    {126992L,"SystemTime"},
+    {127245L,"Rudder"},
+    {127250L,"Heading"},
+    {127257L,"Attitude"},
+    {127488L,"EngineRapid"},
+    {127489L,"EngineDynamicParameters"},
+    {127493L,"TransmissionParameters"},
+    {127497L,"TripFuelConsumption"},
+    {127501L,"BinaryStatus"},
+    {127505L,"FluidLevel"},
+    {127506L,"DCStatus"},
+    {127513L,"BatteryConfigurationStatus"},
+    {128259L,"Speed"},
+    {128267L,"WaterDepth"},
+    {129026L,"COGSOG"},
+    {129029L,"GNSS"},
+    {129033L,"LocalOffset"},
+    {129045L,"UserDatumSettings"},
+    {129540L,"GNSSSatsInView"},
+    {130310L,"OutsideEnvironmental"},
+    {130312L,"Temperature"},
+    {130313L,"Humidity"},
+    {130314L,"Pressure"},
+    {130316L,"TemperatureExt"},
   // Add more PGNs and their names as needed
 };
 
@@ -70,6 +95,18 @@ const char* getPGNName(uint32_t pgn) {
     }
   }
   return "Unknown PGN";  // Return a default name for unknown PGNs
+}
+
+void sendNMEA2000Message(uint32_t pgn, uint8_t *data, uint8_t len) {
+  CAN_TxHeaderTypeDef txHeader;
+  txHeader.StdId = pgn;
+  txHeader.IDE = CAN_ID_STD;
+  txHeader.RTR = CAN_RTR_DATA;
+  txHeader.DLC = len;
+
+  if (HAL_CAN_AddTxMessage(&hcan, &txHeader, data, NULL) != HAL_OK) {
+    Error_Handler();
+  }
 }
 /* USER CODE END 0 */
 
@@ -164,8 +201,16 @@ int main(void)
 	            char buffer[50];
 	            sprintf(buffer, "Received NMEA 2000 message: %02X %02X %02X %02X %02X %02X %02X %02X\r\n",
 	                    rxData[0], rxData[1], rxData[2], rxData[3], rxData[4], rxData[5], rxData[6], rxData[7]);
+	            HAL_UART_Transmit(&huart1, (uint8_t*)buffer, strlen(buffer), HAL_MAX_DELAY);
+
+	            // Decode the received NMEA 2000 message
+	            decodeNMEA2000Message(rxData);
 	          }
 	        }
+
+	        // Send a sample NMEA 2000 message
+	        uint8_t sampleData[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
+	        sendNMEA2000Message(130306, sampleData, sizeof(sampleData));
 
 	        HAL_Delay(1000);  // Delay for 1 second
   }
@@ -300,7 +345,23 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void decodeNMEA2000Message(uint8_t *data) {
+  // Example decoding of NMEA 2000 message
+  uint8_t priority = (data[0] >> 2) & 0x07;  // Extract priority from the first byte
+  uint32_t PGN = ((uint32_t)data[1] << 16) | ((uint32_t)data[2] << 8) | data[3];  // Extract PGN from bytes 2, 3, and 4
+  uint8_t destination = data[4];  // Extract destination address
+  uint8_t source = data[5];  // Extract source address
+  // ... Decode other relevant data fields from the message
 
+  // Get the name of the PGN
+  const char* pgnName = getPGNName(PGN);
+
+  // Print the decoded information including the PGN name to the serial interface
+  char buffer[150];
+  sprintf(buffer, "Decoded NMEA 2000 message - Priority: %d, PGN: %lu (%s), Destination: %d, Source: %d\r\n",
+          priority, PGN, pgnName, destination, source);
+  HAL_UART_Transmit(&huart1, (uint8_t*)buffer, strlen(buffer), HAL_MAX_DELAY);
+}
 /* USER CODE END 4 */
 
 /**
