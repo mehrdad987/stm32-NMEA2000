@@ -1,7 +1,8 @@
 going to edit
 
 ''
-'
+#proj
+
 void decodeNMEA2000Message(uint8_t *data) {
   uint8_t priority = (data[0] >> 2) & 0x07;  // Extract priority from the first byte
   uint32_t PGN = ((uint32_t)data[1] << 16) | ((uint32_t)data[2] << 8) | data[3];  // Extract PGN from bytes 2, 3, and 4
