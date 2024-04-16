@@ -71,18 +71,6 @@ const char* getPGNName(uint32_t pgn) {
   }
   return "Unknown PGN";  // Return a default name for unknown PGNs
 }
-
-void sendNMEA2000Message(uint32_t pgn, uint8_t *data, uint8_t len) {
-  CAN_TxHeaderTypeDef txHeader;
-  txHeader.StdId = pgn;
-  txHeader.IDE = CAN_ID_STD;
-  txHeader.RTR = CAN_RTR_DATA;
-  txHeader.DLC = len;
-
-  if (HAL_CAN_AddTxMessage(&hcan, &txHeader, data, NULL) != HAL_OK) {
-    Error_Handler();
-  }
-}
 /* USER CODE END 0 */
 
 /**
