@@ -142,25 +142,6 @@ int main(void)
   MX_CAN_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-  // Initialize CAN peripheral
-   hcan.Instance = CAN1;
-   hcan.Init.Mode = CAN_MODE_NORMAL;
-   hcan.Init.AutoBusOff = ENABLE;
-   hcan.Init.AutoRetransmission = ENABLE;
-   hcan.Init.AutoWakeUp = DISABLE;
-   hcan.Init.ReceiveFifoLocked = DISABLE;
-   hcan.Init.TimeTriggeredMode = DISABLE;
-   hcan.Init.TransmitFifoPriority = DISABLE;
-   hcan.Init.Prescaler = 16;
-   hcan.Init.SyncJumpWidth = CAN_SJW_1TQ;
-   hcan.Init.TimeSeg1 = CAN_BS1_3TQ;
-   hcan.Init.TimeSeg2 = CAN_BS2_5TQ;
-   HAL_CAN_Init(&hcan);
-
-   // Start the CAN peripheral
-   if (HAL_CAN_Start(&hcan) != HAL_OK) {
-     Error_Handler();
-   }
 
    // Configure CAN filter to receive all messages
 
