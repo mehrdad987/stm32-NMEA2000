@@ -1,7 +1,7 @@
 > [!IMPORTANT]
 > Still on Testing
 > 
-># going to edit #
+>## Going to edit ##
 
-** working on a sw to extract every pgn 
+**Working on a switch to extract every PGN 
 
