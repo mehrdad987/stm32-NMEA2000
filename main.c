@@ -5,7 +5,8 @@
 
 CAN_HandleTypeDef hcan;
 UART_HandleTypeDef huart1;
-
+uint8_t dataLength;
+uint8_t sequenceNumber;
 CAN_FilterTypeDef canFilterConfig;
 
 void SystemClock_Config(void);
@@ -16,9 +17,14 @@ typedef struct {
   uint32_t pgn;
   const char *name;
 } PGN_Name;
-
+typedef struct {
+    uint32_t pgn;
+    uint8_t sourceAddress;
+    uint8_t dataLength;
+    uint8_t data[8]; // Maximum size for CAN frame
+} CanMessage;
 // Lookup table mapping PGNs to their names
-PGN_Name pgnNames[] = {
+/*PGN_Name pgnNames[] = {
     {129029, "GNSS Position Data"},
     {130306, "Wind Data"},
     {126992L,"SystemTime"},
@@ -56,7 +62,7 @@ const char* getPGNName(uint32_t pgn) {
     }
   }
   return "Unknown PGN";  // Return a default name for unknown PGNs
-}
+}*/
 
 int main(void) {
   HAL_Init();
@@ -80,35 +86,128 @@ int main(void) {
 
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
     CAN_RxHeaderTypeDef rxHeader;
-    uint8_t rxData[8];
+    uint8_t rxData[32];
 
     if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &rxHeader, rxData) == HAL_OK) {
-        // Extracting source address, destination address, PGN, priority, and data length
-    	uint8_t priority = (rxHeader.ExtId >> 26) & 0x07;
-    	uint32_t pgn = (rxHeader.ExtId >> 8) & 0x3FFFF;
-    	uint8_t sourceAddress = rxHeader.ExtId & 0xFF;
-      uint8_t deviceinstance = (rxHeader.ExtId >> 18) & 0x1F;
-      if(rxHeader.IDE== CAN_ID_EXT) {
-        uint32_t extId = rxHeader.ExtId;
-        seq = (extId >> 18) & 0x1F;
-        dataLength = (extId >> 8) & 0xFF;
-      }else{
-        // Extracting destination address and data from the data payload
-      	uint8_t destinationAddress = rxData[0];
-    	  uint8_t dataLength = rxHeader.DLC; //
-      }
+        // Extracting priority, PGN, source address, and device instance from the CAN ID
+        uint8_t priority = (rxHeader.ExtId >> 26) & 0x07;
+        uint32_t pgn = (rxHeader.ExtId >> 8) & 0x3FFFF;
+        uint8_t sourceAddress = rxHeader.ExtId & 0xFF;
+        uint8_t deviceInstance = (rxHeader.ExtId >> 18) & 0x1F;
 
-        // Print the extracted information over UART
-        char buffer[100];
-        int len = sprintf(buffer, "Priority: 0x%02X, PGN: 0x%06X, Source: 0x%02X, Dest: 0x%02X, Data Length: 0x%02X, Data: ", priority, pgn, sourceAddress, destinationAddress, dataLength);
+        if (rxHeader.IDE == CAN_ID_EXT) {
+            // Handle the extended CAN frame
+            uint32_t extId = rxHeader.ExtId;
+            sequenceNumber = (extId >> 18) & 0x1F;
+            dataLength = (extId >> 8) & 0xFF; // Extract the data length from the extended ID
+            if(dataLength <= 8){
+                dataLength = rxHeader.DLC;
+            }
+        } else {
+            dataLength = rxHeader.DLC; // Use the DLC value for standard CAN frames
+        }
+
+        // Determine the destination address based on the PGN
+        uint8_t destinationAddress = 0xFF; // Default value, you may need to determine the destination address based on the PGN
+
+        char buff[100];
+        int lenraw = sprintf(buff, "Source: 0x%02X, Dest: 0x%02X, PGN: %lu, Priority: 0x%02X, Data Length: %u, Data: ", sourceAddress, destinationAddress, pgn, priority, dataLength);
 
         for (int i = 0; i < dataLength; i++) {
-            len += sprintf(&buffer[len], "%02X ", rxData[i]);
+            lenraw += sprintf(&buff[lenraw], "%02X ", rxData[i]);
         }
-        buffer[len++] = '\r';
-        buffer[len++] = '\n';
+        buff[lenraw++] = '\r';
+        buff[lenraw++] = '\n';
 
-        HAL_UART_Transmit(&huart1, (uint8_t*)buffer, len, HAL_MAX_DELAY);
+        HAL_UART_Transmit(&huart1, (uint8_t*)buff, lenraw, HAL_MAX_DELAY);
+
+        /*switch (pgn) {
+
+                    case 130316: // Temperature
+                                    {
+                                        // Extract temperature data (assuming 12 bytes)
+                                        uint16_t temperature1 = rxData[0] | (rxData[1] << 8);
+                                        uint16_t temperature2 = rxData[2] | (rxData[3] << 8);
+                                        uint16_t temperature3 = rxData[4] | (rxData[5] << 8);
+                                        uint16_t temperature4 = rxData[6] | (rxData[7] << 8);
+                                        char uartBuffer[100];
+                                                            int len = snprintf(uartBuffer, sizeof(uartBuffer),
+                                                                               "PGN: %lu, Temperature1: %u, Temperature2: %u, Temperature3: %u, Temperature4: %u\r\n",
+                                                                               pgn, temperature1, temperature2, temperature3, temperature4);
+                                                            HAL_UART_Transmit(&huart1, (uint8_t*)uartBuffer, len, HAL_MAX_DELAY);
+
+                                        // Now you can use the extracted temperature data as needed
+                                        // ...
+                                    }
+
+                    	// Handle these PGNs as before
+                    	break;
+
+                    case 127489: // Engine Dynamic Parameters
+                        {
+                            if (dataLength > 8) {
+                                // Handle the extended data payload
+                                uint8_t numFrames = (dataLength + 7) / 8; // Calculate the number of frames needed to transmit the data
+                                uint8_t currentFrame = 0;
+                                uint8_t remainingData = dataLength;
+
+                                while (remainingData > 0) {
+                                    uint8_t frameLength = (remainingData > 8) ? 8 : remainingData;
+                                    char frameBuffer[200];
+                                    int frameLen = sprintf(frameBuffer, "Source: 0x%02X, Dest: 0x%02X, PGN: %lu, Priority: 0x%02X, Device Instance: 0x%02X, Frame: %u/%u, Data: ",
+                                                          sourceAddress, destinationAddress, pgn, priority, deviceInstance, currentFrame + 1, numFrames);
+
+                                    for (int i = 0; i < frameLength; i++) {
+                                        frameLen += sprintf(&frameBuffer[frameLen], "%02X ", rxData[currentFrame * 8 + i]);
+                                    }
+
+                                    frameBuffer[frameLen++] = '\r';
+                                    frameBuffer[frameLen++] = '\n';
+                                    HAL_UART_Transmit(&huart1, (uint8_t*)frameBuffer, frameLen, HAL_MAX_DELAY);
+
+                                    currentFrame++;
+                                    remainingData -= frameLength;
+                                }
+                            } else {
+                                // Extract the data from the first 8 bytes
+                                uint16_t engineOilPressure = rxData[2] | (rxData[3] << 8);
+                                int16_t engineCoolantTemperature = rxData[4] | (rxData[5] << 8);
+                                uint16_t engineSpeed = rxData[0] | (rxData[1] << 8);
+                                uint32_t engineHours = (rxData[6] | (rxData[7] << 8)) * 50;
+
+                                // Get the additional data for PGN 127489
+                                uint16_t engineTorque = 0;
+                                uint16_t fuelRate = 0;
+                                uint16_t engineCoolantPressure = 0;
+
+                                if (dataLength > 8) {
+                                    // Read the additional data
+                                    engineTorque = rxData[8] | (rxData[9] << 8);
+                                    fuelRate = rxData[10] | (rxData[11] << 8);
+                                    engineCoolantPressure = rxData[12] | (rxData[13] << 8);
+                                }
+
+                                // Print the extracted information over UART
+                                char buffer[200];
+                                int len = sprintf(buffer, "Source: 0x%02X, Dest: 0x%02X, PGN: %lu, Priority: 0x%02X, Device Instance: 0x%02X, Data Length: %u\r\n"
+                                                          "Oil Pressure: %u kPa, Coolant Temp: %d°C\r\n"
+                                                          "Engine Speed: %u RPM, Engine Hours: %u h\r\n"
+                                                          "Engine Torque: %u Nm, Fuel Rate: %u L/h\r\n"
+                                                          "Coolant Pressure: %u kPa\r\n",
+                                                 sourceAddress, destinationAddress, pgn, priority, deviceInstance, dataLength,
+                                                 engineOilPressure, engineCoolantTemperature,
+                                                 engineSpeed, engineHours,
+                                                 engineTorque, fuelRate,
+                                                 engineCoolantPressure);
+                                HAL_UART_Transmit(&huart1, (uint8_t*)buffer, len, HAL_MAX_DELAY);
+                            }
+                        }
+                        break;
+
+                    default:
+                    	// Handle other PGNs as needed
+                    	break;
+        }*/
     }
 }
 
@@ -139,21 +238,22 @@ void SystemClock_Config(void) {
 }
 
 static void MX_CAN_Init(void) {
-  hcan.Instance = CAN1;
-  hcan.Init.Prescaler = 8;
-  hcan.Init.Mode = CAN_MODE_NORMAL;
-  hcan.Init.SyncJumpWidth = CAN_SJW_1TQ;
-  hcan.Init.TimeSeg1 = CAN_BS1_10TQ;
-  hcan.Init.TimeSeg2 = CAN_BS2_7TQ;
-  hcan.Init.TimeTriggeredMode = DISABLE;
-  hcan.Init.AutoBusOff = DISABLE;
-  hcan.Init.AutoWakeUp = DISABLE;
-  hcan.Init.AutoRetransmission = DISABLE;
-  hcan.Init.ReceiveFifoLocked = DISABLE;
-  hcan.Init.TransmitFifoPriority = DISABLE;
-  if (HAL_CAN_Init(&hcan) != HAL_OK) {
-    Error_Handler();
-  }
+    hcan.Instance = CAN1;
+    hcan.Init.Prescaler = 8;
+    hcan.Init.Mode = CAN_MODE_NORMAL;
+    hcan.Init.SyncJumpWidth = CAN_SJW_1TQ;
+    hcan.Init.TimeSeg1 = CAN_BS1_10TQ;
+    hcan.Init.TimeSeg2 = CAN_BS2_7TQ;
+    hcan.Init.TimeTriggeredMode = DISABLE;
+    hcan.Init.AutoBusOff = DISABLE;
+    hcan.Init.AutoWakeUp = DISABLE;
+    hcan.Init.AutoRetransmission = DISABLE;
+    hcan.Init.ReceiveFifoLocked = DISABLE;
+    hcan.Init.TransmitFifoPriority = DISABLE;
+    //hcan.Init.ExtendedMode = CAN_EXTENDEDFRAME; // Enable extended ID format
+    if (HAL_CAN_Init(&hcan) != HAL_OK) {
+        Error_Handler();
+    }
 
   canFilterConfig.FilterActivation = CAN_FILTER_ENABLE;
   canFilterConfig.FilterBank = 0;
@@ -195,4 +295,3 @@ void assert_failed(uint8_t *file, uint32_t line) {
   // User can add his own implementation to report the file name and line number
 }
 #endif
-
