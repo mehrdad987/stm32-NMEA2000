@@ -85,12 +85,18 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
     if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &rxHeader, rxData) == HAL_OK) {
         // Extracting source address, destination address, PGN, priority, and data length
     	uint8_t priority = (rxHeader.ExtId >> 26) & 0x07;
-    	        uint32_t pgn = (rxHeader.ExtId >> 8) & 0x3FFFF;
-    	        uint8_t sourceAddress = rxHeader.ExtId & 0xFF;
-
-    	        // Extracting destination address and data from the data payload
-    	        uint8_t destinationAddress = rxData[0];
-    	        uint8_t dataLength = rxHeader.DLC - 1; //
+    	uint32_t pgn = (rxHeader.ExtId >> 8) & 0x3FFFF;
+    	uint8_t sourceAddress = rxHeader.ExtId & 0xFF;
+      uint8_t deviceinstance = (rxHeader.ExtId >> 18) & 0x1F;
+      if(rxHeader.IDE== CAN_ID_EXT) {
+        uint32_t extId = rxHeader.ExtId;
+        seq = (extId >> 18) & 0x1F;
+        dataLength = (extId >> 8) & 0xFF;
+      }else{
+        // Extracting destination address and data from the data payload
+      	uint8_t destinationAddress = rxData[0];
+    	  uint8_t dataLength = rxHeader.DLC; //
+      }
 
         // Print the extracted information over UART
         char buffer[100];
