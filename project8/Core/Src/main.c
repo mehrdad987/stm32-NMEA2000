@@ -24,7 +24,7 @@ typedef struct {
     uint8_t data[8]; // Maximum size for CAN frame
 } CanMessage;
 // Lookup table mapping PGNs to their names
-/*PGN_Name pgnNames[] = {
+PGN_Name pgnNames[] = {
     {129029, "GNSS Position Data"},
     {130306, "Wind Data"},
     {126992L,"SystemTime"},
@@ -62,7 +62,7 @@ const char* getPGNName(uint32_t pgn) {
     }
   }
   return "Unknown PGN";  // Return a default name for unknown PGNs
-}*/
+}
 
 int main(void) {
   HAL_Init();
@@ -121,7 +121,7 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
 
         HAL_UART_Transmit(&huart1, (uint8_t*)buff, lenraw, HAL_MAX_DELAY);
 
-        /*switch (pgn) {
+        switch (pgn) {
 
                     case 130316: // Temperature
                                     {
@@ -207,7 +207,7 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
                     default:
                     	// Handle other PGNs as needed
                     	break;
-        }*/
+        }
     }
 }
 
