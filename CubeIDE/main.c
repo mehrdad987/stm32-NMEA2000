@@ -1,7 +1,7 @@
 
 #include "main.h"
 #include "stm32f1xx_hal.h"
-#include "stdio.h"
+//#include "stdio.h"
 
 CAN_HandleTypeDef hcan;
 UART_HandleTypeDef huart1;
