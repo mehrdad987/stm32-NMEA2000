@@ -17,8 +17,8 @@ static CAN_message_t CAN_RX_msg;
 void setup() {
   Serial.begin(115200);
   Can.begin();
-  Can.setBaudRate(250000);  //250KBPS
-  //Can.setBaudRate(500000);  //500KBPS
+  //Can.setBaudRate(250000);  //250KBPS
+  Can.setBaudRate(500000);  //500KBPS
   //Can.setBaudRate(1000000);  //1000KBPS
 }
 
